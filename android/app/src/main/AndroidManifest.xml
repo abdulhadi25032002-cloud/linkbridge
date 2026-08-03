@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Networking -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Foreground service to keep the remote connection alive -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Consent prompts as heads-up notifications (Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Camera: requested only when the owner opens a camera session -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- Gallery: requested only when the owner opens the gallery for the first time -->
+    <uses-permission
+        android:name="android.permission.READ_MEDIA_IMAGES"
+        android:minSdkVersion="33" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32"
+        tools:ignore="ScopedStorage" />
+
+    <!-- Deliberately absent: RECORD_AUDIO, SMS, CONTACTS, location, call logs -->
+
+    <application
+        android:name=".LinkBridgeApp"
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.LinkBridge"
+        tools:targetApi="35">
+
+        <!-- Main activity: device status + per-session permission gates -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Pairing flow: launched by a secure deep link / App Link -->
+        <activity
+            android:name=".PairingActivity"
+            android:exported="true"
+            android:launchMode="singleTask">
+            <!-- Custom scheme deep link: linkbridge://pair?t=TOKEN -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="linkbridge" android:host="pair" />
+            </intent-filter>
+
+            <!-- Verified App Link: https://<APP_LINK_HOST>/pair?t=TOKEN
+                 Requires hosting .well-known/assetlinks.json — see docs/ANDROID.md -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="pair.linkbridge.example" android:pathPrefix="/pair" />
+            </intent-filter>
+        </activity>
+
+        <!-- Foreground service hosting the signaling + WebRTC connection -->
+        <service
+            android:name=".service.RemoteService"
+            android:exported="false"
+            android:foregroundServiceType="mediaProjection|dataSync|camera" />
+
+        <!-- Receives Accept/Deny taps on consent notifications -->
+        <receiver
+            android:name=".consent.ConsentActionReceiver"
+            android:exported="false" />
+
+        <!-- Touch control: enabled by the user in Accessibility settings.
+             The app only uses dispatchGesture (no event sniffing). -->
+        <service
+            android:name=".remote.RemoteAccessibilityService"
+            android:exported="false"
+            android:label="@string/accessibility_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+    </application>
+</manifest>

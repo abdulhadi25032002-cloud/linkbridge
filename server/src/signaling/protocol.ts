@@ -27,7 +27,13 @@ export type OutboundMessage =
   | { type: 'authed'; peer: 'owner' | 'device'; userId: string; deviceId?: string }
   | { type: 'device.presence'; deviceId: string; status: 'online' | 'offline' }
   | { type: 'session.status'; sessionId: string; deviceId: string; kind: string; status: string }
-  | { type: 'consent.request'; sessionId: string; kind: string; requestedAt: string }
+  | {
+      type: 'consent.request';
+      sessionId: string;
+      kind: string;
+      requestedAt: string;
+      turn?: { url: string; username: string; credential: string };
+    }
   | { type: 'signal'; sessionId: string; from: 'owner' | 'device'; data: SignalData }
   | { type: 'session.end'; sessionId: string }
   | { type: 'relay.data'; sessionId: string; from: 'owner' | 'device'; channel: string; payload: string }

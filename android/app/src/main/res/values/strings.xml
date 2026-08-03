@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">LinkBridge</string>
+    <string name="accessibility_service_label">LinkBridge touch control</string>
+
+    <!-- Main / status -->
+    <string name="status_title">Device status</string>
+    <string name="status_online">Connected to LinkBridge</string>
+    <string name="status_offline">Not paired yet</string>
+    <string name="capability_screen">Screen sharing</string>
+    <string name="capability_touch">Touch control</string>
+    <string name="capability_camera">Camera</string>
+    <string name="capability_gallery">Gallery</string>
+    <string name="granted">Granted</string>
+    <string name="not_granted">Not granted</string>
+    <string name="enable">Enable</string>
+    <string name="pair_now">Pair a new device</string>
+    <string name="sign_out">Sign out of this device</string>
+    <string name="paired_as">Paired device</string>
+
+    <!-- Pairing -->
+    <string name="pairing_title">Pair with your dashboard</string>
+    <string name="pairing_description">LinkBridge lets you view and control this phone from your own PC dashboard. All connections require your approval on this phone.</string>
+    <string name="pairing_consent">Allow LinkBridge to pair this phone with your account?</string>
+    <string name="pairing_accept">Accept</string>
+    <string name="pairing_decline">Decline</string>
+    <string name="pairing_step_notifications">Allow notifications (used for approval prompts)</string>
+    <string name="pairing_step_screen">Grant screen sharing access</string>
+    <string name="pairing_step_accessibility">Enable touch control in Accessibility settings</string>
+    <string name="pairing_waiting">Waiting for you…</string>
+    <string name="pairing_open_settings">Open settings</string>
+    <string name="pairing_complete">Paired successfully. This device is now online.</string>
+    <string name="pairing_failed">Pairing failed: %1$s</string>
+    <string name="pairing_cancel">Cancel pairing</string>
+
+    <!-- Consent notification -->
+    <string name="consent_channel_name">Connection approvals</string>
+    <string name="consent_channel_desc">Requests from your dashboard need your approval</string>
+    <string name="consent_title">Allow %1$s?</string>
+    <string name="consent_screen_body">Your PC dashboard wants to view and control this screen.</string>
+    <string name="consent_camera_body">Your PC dashboard wants to use the camera.</string>
+    <string name="consent_gallery_body">Your PC dashboard wants to open the gallery.</string>
+    <string name="consent_accept">Allow</string>
+    <string name="consent_deny">Deny</string>
+
+    <!-- Service -->
+    <string name="service_channel_name">Remote connection</string>
+    <string name="service_channel_desc">Keeps the secure connection to your dashboard</string>
+    <string name="service_notification_title">LinkBridge is connected</string>
+    <string name="service_notification_body">Waiting for your dashboard</string>
+
+    <!-- Errors -->
+    <string name="error_token_invalid">This pairing link is invalid or expired.</string>
+    <string name="error_network">Cannot reach the LinkBridge server. Check your connection.</string>
+</resources>

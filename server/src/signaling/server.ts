@@ -8,6 +8,7 @@ import {
   resolveConsent,
   type SessionRow,
 } from '../services/sessions.js';
+import { issueTurnCredentials } from '../relay/turn.js';
 import type { InboundMessage, OutboundMessage, SignalData } from './protocol.js';
 
 interface OwnerClient {
@@ -154,11 +155,14 @@ export class SignalingServer {
     }, consentTimeoutMs);
 
     this.sessions.set(session.id, participants);
+
+    const turn = issueTurnCredentials(session.id);
     this.send(device.ws, {
       type: 'consent.request',
       sessionId: session.id,
       kind: session.kind,
       requestedAt: new Date().toISOString(),
+      turn: turn.url ? turn : undefined,
     });
   }
 
