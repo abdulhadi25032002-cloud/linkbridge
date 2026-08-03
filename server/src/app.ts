@@ -1,3 +1,6 @@
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -8,6 +11,11 @@ import { authRouter } from './routes/auth.js';
 import { devicesRouter } from './routes/devices.js';
 import { sessionsRouter } from './routes/sessions.js';
 import type { SignalingServer } from './signaling/server.js';
+
+const WEB_DIST = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '../../web/dist',
+);
 
 export function createApp(getSignaling: () => SignalingServer): express.Express {
   const app = express();
@@ -43,6 +51,13 @@ export function createApp(getSignaling: () => SignalingServer): express.Express 
   app.use('/api/auth', authRouter);
   app.use('/api/devices', devicesRouter);
   app.use('/api/sessions', sessionsRouter(getSignaling));
+
+  if (existsSync(WEB_DIST)) {
+    app.use(express.static(WEB_DIST));
+    app.get(/^(?!\/api|\/ws).*/, (_req, res) => {
+      res.sendFile(path.join(WEB_DIST, 'index.html'));
+    });
+  }
 
   app.use((_req, res) => {
     res.status(404).json({ error: 'Not found' });

@@ -1,0 +1,56 @@
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: linkbridge
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-linkbridge_prod}
+      POSTGRES_DB: linkbridge
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U linkbridge']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  server:
+    build: .
+    environment:
+      DATABASE_URL: postgres://linkbridge:${DB_PASSWORD:-linkbridge_prod}@db:5432/linkbridge
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      PAIRING_SALT: ${PAIRING_SALT:?set PAIRING_SALT in .env}
+      WEB_ORIGIN: ${WEB_ORIGIN:-https://localhost}
+      TURN_URL: ${TURN_URL:-}
+      TURN_SECRET: ${TURN_SECRET:-}
+      TURN_TTL: ${TURN_TTL:-3600}
+      PORT: 8080
+    ports:
+      - '8080:8080'
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Optional: WebRTC relay fallback for NAT'd peers.
+  # Enable by setting TURN_URL + TURN_SECRET (must match static-auth-secret).
+  coturn:
+    image: coturn/coturn:latest
+    command:
+      - --listening-port=3478
+      - --fingerprint
+      - --lt-cred-mech
+      - --use-auth-secret
+      - --static-auth-secret=${TURN_SECRET:-}
+      - --realm=${TURN_REALM:-turn.linkbridge.local}
+      - --no-cli
+      - --no-multicast-peers
+    ports:
+      - '3478:3478'
+      - '3478:3478/udp'
+      - '5349:5349'
+      - '5349:5349/udp'
+    restart: unless-stopped
+    profiles: [relay]
+
+volumes:
+  pgdata:
