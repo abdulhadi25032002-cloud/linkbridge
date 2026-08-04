@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { query, queryOne } from '../db/pool.js';
 import { requireAuth, requireDevice, authUserId } from '../auth/middleware.js';
 import { createPairingToken, completePairing, PairingError } from '../services/pairing.js';
+import { listConnectionLogs } from '../services/connectionLogs.js';
 
 export const devicesRouter = Router();
 
@@ -14,8 +15,12 @@ interface DeviceRow {
   android_version: string | null;
   app_version: string | null;
   status: 'pairing' | 'online' | 'offline';
+  connection_status: 'online' | 'offline';
   paired_at: string;
   last_seen_at: string | null;
+  last_heartbeat_at: string | null;
+  connection_changed_at: string | null;
+  reconnect_count: number;
 }
 
 /** List the owner's paired devices with live status. */
@@ -23,13 +28,26 @@ devicesRouter.get('/', requireAuth, async (req: ExpressRequest, res, next) => {
   try {
     const rows = await query<DeviceRow>(
       `SELECT id, name, model, manufacturer, android_version, app_version,
-              status, paired_at, last_seen_at
+              status, connection_status, paired_at, last_seen_at,
+              last_heartbeat_at, connection_changed_at, reconnect_count
          FROM devices
         WHERE user_id = $1
         ORDER BY paired_at DESC`,
       [authUserId(req)],
     );
     res.json({ devices: rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/** Connection log for a single device (heartbeat/reconnect diagnostics). */
+devicesRouter.get('/:deviceId/logs', requireAuth, async (req: ExpressRequest, res, next) => {
+  try {
+    const { deviceId } = z.object({ deviceId: z.string().uuid() }).parse(req.params);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+    const logs = await listConnectionLogs(deviceId, authUserId(req), limit);
+    res.json({ logs });
   } catch (err) {
     next(err);
   }
@@ -120,7 +138,13 @@ devicesRouter.post('/state', requireDevice, async (req: ExpressRequest, res, nex
   try {
     const body = z.object({ status: z.enum(['online', 'offline']) }).parse(req.body);
     await query(
-      `UPDATE devices SET status = $1, last_seen_at = now() WHERE id = $2`,
+      `UPDATE devices
+          SET status = $1,
+              connection_status = $1,
+              last_seen_at = now(),
+              last_heartbeat_at = now(),
+              connection_changed_at = now()
+        WHERE id = $2`,
       [body.status, req.deviceId],
     );
     res.json({ ok: true });

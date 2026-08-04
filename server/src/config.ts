@@ -29,6 +29,10 @@ export const config = {
   webOrigin: process.env.WEB_ORIGIN ?? 'http://localhost:5173',
   pairingBaseUrl: process.env.PAIRING_BASE_URL ?? 'http://localhost:5173',
   appLinkHost: process.env.APP_LINK_HOST ?? 'pair.linkbridge.example',
+  ws: {
+    heartbeatIntervalMs: int(process.env.WS_HEARTBEAT_INTERVAL_MS, 30_000),
+    heartbeatTimeoutMs: int(process.env.WS_HEARTBEAT_TIMEOUT_MS, 60_000),
+  },
   turn: {
     url: process.env.TURN_URL ?? '',
     username: process.env.TURN_USERNAME ?? 'linkbridge',

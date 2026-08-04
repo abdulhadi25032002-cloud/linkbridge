@@ -8,7 +8,9 @@ import {
   resolveConsent,
   type SessionRow,
 } from '../services/sessions.js';
+import { logConnection } from '../services/connectionLogs.js';
 import { issueTurnCredentials } from '../relay/turn.js';
+import { config } from '../config.js';
 import type { InboundMessage, OutboundMessage, SignalData } from './protocol.js';
 
 interface OwnerClient {
@@ -33,20 +35,65 @@ interface SessionParticipants {
   consentTimer?: NodeJS.Timeout;
 }
 
+interface HeartbeatSocket extends WebSocket {
+  isAlive?: boolean;
+  heartbeatTimedOut?: boolean;
+}
+
+/** A re-auth within this window after a disconnect counts as a reconnect. */
+const RECONNECT_GRACE_MS = 90_000;
+
 export class SignalingServer {
   private wss: WebSocketServer;
   private clients = new Set<Client>();
   private sessions = new Map<string, SessionParticipants>();
+  private heartbeatTimer: NodeJS.Timeout;
+  /** deviceId -> epoch ms of the last disconnect (used for reconnect detection). */
+  private lastDisconnectAt = new Map<string, number>();
 
   constructor(server: ReturnType<typeof import('node:http').createServer>) {
     this.wss = new WebSocketServer({ server, path: '/ws' });
     this.wss.on('connection', (ws) => this.handleConnection(ws));
+
+    // Protocol-level heartbeat: ping every interval, terminate clients that
+    // fail to pong within the timeout window (2 intervals = heartbeatTimeoutMs).
+    const { heartbeatIntervalMs } = config.ws;
+    this.heartbeatTimer = setInterval(() => {
+      for (const client of this.clients) {
+        const ws = client.ws;
+        const alive = (ws as HeartbeatSocket).isAlive;
+        if (alive === false) {
+          (ws as HeartbeatSocket).heartbeatTimedOut = true;
+          ws.terminate();
+          continue;
+        }
+        (ws as HeartbeatSocket).isAlive = false;
+        ws.ping();
+      }
+    }, heartbeatIntervalMs);
+    this.heartbeatTimer.unref();
   }
 
   private handleConnection(ws: WebSocket): void {
+    (ws as HeartbeatSocket).isAlive = true;
+    (ws as HeartbeatSocket).heartbeatTimedOut = false;
+    ws.on('pong', () => {
+      (ws as HeartbeatSocket).isAlive = true;
+      void this.recordHeartbeat(ws);
+    });
     ws.on('message', (raw) => this.handleMessage(ws, raw));
     ws.on('close', () => this.handleClose(ws));
     ws.on('error', () => ws.terminate());
+  }
+
+  private async recordHeartbeat(ws: WebSocket): Promise<void> {
+    const client = this.findClient(ws);
+    if (client?.type !== 'device') return;
+    try {
+      await query(`UPDATE devices SET last_heartbeat_at = now() WHERE id = $1`, [client.deviceId]);
+    } catch {
+      // non-critical monitoring write
+    }
   }
 
   private async handleMessage(ws: WebSocket, raw: WebSocket.RawData): Promise<void> {
@@ -109,16 +156,36 @@ export class SignalingServer {
         }
         this.clients.add(client);
         this.send(ws, { type: 'authed', peer: 'device', userId: payload.userId, deviceId: payload.sub });
-        await query(
-          `UPDATE devices SET status = 'online', last_seen_at = now() WHERE id = $1`,
-          [payload.sub],
-        );
-        this.broadcastPresence(client.userId, payload.sub, 'online');
+        await this.markDeviceConnected(client);
       }
     } catch {
       this.send(ws, { type: 'error', message: 'Invalid token' });
       ws.close(1008, 'Invalid token');
     }
+  }
+
+  /** Record a device connection, distinguishing first connect from reconnect. */
+  private async markDeviceConnected(client: DeviceClient): Promise<void> {
+    const lastDisconnect = this.lastDisconnectAt.get(client.deviceId) ?? 0;
+    const isReconnect = Date.now() - lastDisconnect < RECONNECT_GRACE_MS;
+    this.lastDisconnectAt.delete(client.deviceId);
+    await query(
+      `UPDATE devices
+          SET status = 'online',
+              connection_status = 'online',
+              last_seen_at = now(),
+              last_heartbeat_at = now(),
+              connection_changed_at = now(),
+              reconnect_count = reconnect_count + $1
+        WHERE id = $2`,
+      [isReconnect ? 1 : 0, client.deviceId],
+    );
+    await logConnection(
+      client.deviceId,
+      isReconnect ? 'reconnected' : 'connected',
+      { peer: 'device' },
+    );
+    this.broadcastPresence(client.userId, client.deviceId, 'online');
   }
 
   private async pushPresenceSnapshot(client: OwnerClient): Promise<void> {
@@ -289,20 +356,45 @@ export class SignalingServer {
     this.clients.delete(client);
 
     // End sessions this client was part of, then tear them down.
+    const interruptedSessionIds: string[] = [];
     for (const [sessionId, participants] of this.sessions) {
       const involved =
         (participants.owner && participants.owner.ws === ws) ||
         (participants.device && participants.device.ws === ws);
       if (involved) {
+        interruptedSessionIds.push(sessionId);
         void endSession(sessionId);
         this.teardownSession(sessionId);
       }
     }
 
     if (client.type === 'device') {
-      void query(`UPDATE devices SET status = 'offline' WHERE id = $1`, [client.deviceId]);
+      this.lastDisconnectAt.set(client.deviceId, Date.now());
+      const timedOut = (ws as HeartbeatSocket).heartbeatTimedOut === true;
+      void query(
+        `UPDATE devices
+            SET status = 'offline',
+                connection_status = 'offline',
+                last_seen_at = now(),
+                connection_changed_at = now()
+          WHERE id = $1`,
+        [client.deviceId],
+      );
+      void logConnection(client.deviceId, timedOut ? 'heartbeat_timeout' : 'disconnected', {
+        reason: timedOut ? 'timeout' : 'close',
+        interruptedSessions: interruptedSessionIds,
+      });
       this.broadcastPresence(client.userId, client.deviceId, 'offline');
     }
+  }
+
+  /** Stop the heartbeat timer and close all sockets (used by tests/shutdown). */
+  stop(): void {
+    clearInterval(this.heartbeatTimer);
+    for (const client of this.clients) {
+      client.ws.close(1001, 'Server shutting down');
+    }
+    this.wss.close();
   }
 
   private findClient(ws: WebSocket): Client | undefined {

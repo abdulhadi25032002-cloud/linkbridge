@@ -189,4 +189,32 @@ describe('device pairing + sessions API', () => {
       .send({ deviceId, kind: 'microphone' });
     expect(res.status).toBe(400);
   });
+
+  it('exposes connection monitoring fields on devices', async () => {
+    const res = await request(app).get('/api/devices').set('Authorization', `Bearer ${ownerToken}`);
+    expect(res.status).toBe(200);
+    const device = res.body.devices[0];
+    expect(device.connection_status).toBeDefined();
+    expect(device.reconnect_count).toBe(0);
+    expect(device.last_heartbeat_at).toBeDefined();
+    expect(device.connection_changed_at).toBeDefined();
+  });
+
+  it('lists connection logs for an owned device and blocks foreign access', async () => {
+    const devices = await request(app).get('/api/devices').set('Authorization', `Bearer ${ownerToken}`);
+    const deviceId = devices.body.devices[0].id;
+
+    const res = await request(app)
+      .get(`/api/devices/${deviceId}/logs`)
+      .set('Authorization', `Bearer ${ownerToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.logs)).toBe(true);
+
+    const other = await register('eve', 'supersecret1');
+    const foreign = await request(app)
+      .get(`/api/devices/${deviceId}/logs`)
+      .set('Authorization', `Bearer ${other.body.accessToken}`);
+    expect(foreign.status).toBe(200);
+    expect(foreign.body.logs).toHaveLength(0);
+  });
 });
