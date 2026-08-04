@@ -11,8 +11,25 @@ export interface Device {
   android_version: string | null;
   app_version: string | null;
   status: 'pairing' | 'online' | 'offline';
+  connection_status: 'online' | 'offline';
   paired_at: string;
   last_seen_at: string | null;
+  last_heartbeat_at: string | null;
+  connection_changed_at: string | null;
+  reconnect_count: number;
+}
+
+export type ConnectionEvent =
+  | 'connected'
+  | 'disconnected'
+  | 'reconnected'
+  | 'heartbeat_timeout';
+
+export interface ConnectionLog {
+  id: string;
+  event: ConnectionEvent;
+  detail: Record<string, unknown>;
+  created_at: string;
 }
 
 export type SessionKind = 'screen' | 'camera' | 'gallery';

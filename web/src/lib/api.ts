@@ -110,6 +110,10 @@ export const apiClient = {
     }),
   unpairDevice: (id: string) =>
     api<{ ok: boolean }>(`/api/devices/${id}`, { method: 'DELETE' }),
+  deviceLogs: (id: string, limit = 20) =>
+    api<{ logs: import('./types.js').ConnectionLog[] }>(
+      `/api/devices/${id}/logs?limit=${limit}`,
+    ),
   createSession: (deviceId: string, kind: import('./types.js').SessionKind) =>
     api<{ session: import('./types.js').RemoteSession }>('/api/sessions', {
       method: 'POST',

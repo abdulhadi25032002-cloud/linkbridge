@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Device } from '../lib/types.js';
 import { StatusBadge } from './StatusBadge.js';
 import { Button } from './Button.js';
+import { ConnectionLogsModal } from './ConnectionLogsModal.js';
 
 interface Props {
   device: Device;
@@ -9,9 +11,16 @@ interface Props {
   onUnpair: (id: string) => void;
 }
 
+function heartbeatFreshness(device: Device): string {
+  if (device.status !== 'online' || !device.last_heartbeat_at) return 'No heartbeat';
+  const seconds = Math.max(0, Math.round((Date.now() - new Date(device.last_heartbeat_at).getTime()) / 1000));
+  return `Heartbeat ${seconds < 60 ? `${seconds}s` : `${Math.round(seconds / 60)}m`} ago`;
+}
+
 export function DeviceCard({ device, onRename, onUnpair }: Props) {
   const navigate = useNavigate();
   const online = device.status === 'online';
+  const [showLogs, setShowLogs] = useState(false);
 
   return (
     <div className="rounded-2xl border border-slate-800 bg-surface-800 p-5 shadow-lg transition-colors hover:border-slate-700">
@@ -45,6 +54,14 @@ export function DeviceCard({ device, onRename, onUnpair }: Props) {
             {device.last_seen_at ? new Date(device.last_seen_at).toLocaleString() : 'Never'}
           </dd>
         </div>
+        <div>
+          <dt className="text-slate-500">Heartbeat</dt>
+          <dd className={online ? 'text-emerald-400' : 'text-slate-300'}>{heartbeatFreshness(device)}</dd>
+        </div>
+        <div>
+          <dt className="text-slate-500">Reconnects</dt>
+          <dd className="text-slate-300">{device.reconnect_count}</dd>
+        </div>
       </dl>
 
       <div className="flex gap-2">
@@ -55,6 +72,9 @@ export function DeviceCard({ device, onRename, onUnpair }: Props) {
           onClick={() => navigate(`/devices/${device.id}`)}
         >
           Connect
+        </Button>
+        <Button variant="ghost" onClick={() => setShowLogs(true)}>
+          Logs
         </Button>
         <Button
           variant="ghost"
@@ -69,6 +89,8 @@ export function DeviceCard({ device, onRename, onUnpair }: Props) {
           Unpair
         </Button>
       </div>
+
+      {showLogs && <ConnectionLogsModal device={device} onClose={() => setShowLogs(false)} />}
     </div>
   );
 }

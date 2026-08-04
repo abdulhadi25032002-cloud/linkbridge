@@ -65,6 +65,27 @@ export function PairingModal({ pairing, onClose }: Props) {
           <span className="text-slate-500">Token valid once</span>
         </div>
 
+        <div className="mt-5 rounded-xl border border-slate-700 bg-surface-900/60 p-4">
+          <h3 className="text-sm font-semibold text-white">What happens on your phone</h3>
+          <ol className="mt-2 list-decimal space-y-1.5 pl-4 text-xs text-slate-400">
+            <li>
+              You&apos;re shown a consent screen explaining exactly what LinkBridge needs and why.
+            </li>
+            <li>
+              Only after you accept, Android&apos;s official permission screens open, one at a time:
+              notifications, screen capture, and accessibility (touch control).
+            </li>
+            <li>
+              You grant each on the system screen — the app never bypasses them. Pairing completes
+              automatically when you&apos;re done.
+            </li>
+            <li>
+              The device appears here as <span className="text-emerald-400">Online</span> and is
+              ready for a remote session. Every session still asks for consent on the device first.
+            </li>
+          </ol>
+        </div>
+
         <div className="mt-5 flex justify-end">
           <Button variant="secondary" onClick={onClose}>
             Close

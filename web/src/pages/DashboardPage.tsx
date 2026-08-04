@@ -41,16 +41,24 @@ export default function DashboardPage() {
     loadDevices();
   }, [loadDevices]);
 
-  // Keep device status live from the signaling channel.
+  // Keep device status live from the signaling channel and refresh the full
+  // list (heartbeat, reconnect counts) on any presence change.
   useEffect(() => {
     return attach({
-      onDevicePresence: (deviceId, status) => {
-        setDevices((prev) =>
-          prev.map((d) => (d.id === deviceId ? { ...d, status } : d)),
-        );
+      onDevicePresence: (_deviceId, _status) => {
+        void loadDevices();
       },
     });
-  }, [attach]);
+  }, [attach, loadDevices]);
+
+  // Light polling keeps heartbeat freshness and reconnect counts up to date
+  // even when nothing else changes.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      void loadDevices();
+    }, 30_000);
+    return () => clearInterval(timer);
+  }, [loadDevices]);
 
   const createPairing = async () => {
     setPairingBusy(true);
