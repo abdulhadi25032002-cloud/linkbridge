@@ -1,4 +1,5 @@
 import { query } from '../db/pool.js';
+import { logger } from '../logger.js';
 
 export type ConnectionEvent =
   | 'connected'
@@ -21,7 +22,11 @@ export async function logConnection(
       [deviceId, event, JSON.stringify(detail)],
     );
   } catch (err) {
-    console.error('[connectionLogs] failed to record event', event, err);
+    logger.error('failed to record connection event', {
+      event,
+      deviceId,
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
 }
 

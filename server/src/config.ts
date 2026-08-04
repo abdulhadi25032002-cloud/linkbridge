@@ -18,6 +18,7 @@ function required(name: string, fallback: string): string {
 
 export const config = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
+  logLevel: process.env.LOG_LEVEL ?? (process.env.NODE_ENV === 'production' ? 'info' : 'debug'),
   port: int(process.env.PORT, 8080),
   databaseUrl: process.env.DATABASE_URL ?? 'postgres://linkbridge:linkbridge_dev@localhost:5432/linkbridge',
   jwt: {

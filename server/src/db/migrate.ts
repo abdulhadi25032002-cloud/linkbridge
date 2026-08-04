@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { pool } from './pool.js';
+import { logger } from '../logger.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -29,10 +30,13 @@ export async function runMigrations(): Promise<void> {
       await client.query(sql);
       await client.query('INSERT INTO schema_migrations (name) VALUES ($1)', [file]);
       await client.query('COMMIT');
-      console.log(`[migrate] applied ${file}`);
+      logger.info('migration applied', { file });
     } catch (err) {
       await client.query('ROLLBACK');
-      console.error(`[migrate] failed on ${file}`, err);
+      logger.error('migration failed', {
+        file,
+        error: err instanceof Error ? err.message : String(err),
+      });
       throw err;
     } finally {
       client.release();
@@ -43,11 +47,13 @@ export async function runMigrations(): Promise<void> {
 if (process.argv[1]?.endsWith('migrate.ts') || process.argv[1]?.endsWith('migrate.js')) {
   runMigrations()
     .then(() => {
-      console.log('[migrate] done');
+      logger.info('migrations complete');
       process.exit(0);
     })
     .catch((err) => {
-      console.error(err);
+      logger.error('migration run failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
       process.exit(1);
     });
 }

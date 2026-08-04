@@ -1,5 +1,6 @@
 import { Pool, type QueryResultRow } from 'pg';
 import { config } from '../config.js';
+import { logger } from '../logger.js';
 
 export const pool = new Pool({
   connectionString: config.databaseUrl,
@@ -9,7 +10,7 @@ export const pool = new Pool({
 });
 
 pool.on('error', (err) => {
-  console.error('[db] unexpected pool error', err);
+  logger.error('unexpected pool error', { error: err.message });
 });
 
 /** Run a query with named parameters, returning the result rows. */

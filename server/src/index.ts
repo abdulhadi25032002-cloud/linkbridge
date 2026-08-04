@@ -4,8 +4,10 @@ import { createApp } from './app.js';
 import { SignalingServer } from './signaling/server.js';
 import { runMigrations } from './db/migrate.js';
 import { ensureAdminAccount } from './routes/auth.js';
+import { logger } from './logger.js';
 
 async function main(): Promise<void> {
+  logger.info('starting', { nodeEnv: config.nodeEnv, port: config.port });
   await runMigrations();
   await ensureAdminAccount();
 
@@ -15,11 +17,16 @@ async function main(): Promise<void> {
   signaling = new SignalingServer(server);
 
   server.listen(config.port, () => {
-    console.log(`[linkbridge] API + WebSocket listening on :${config.port}`);
+    logger.info('listening', { port: config.port, path: '/ws' });
+  });
+
+  server.on('error', (err) => {
+    logger.error('http server error', { error: err.message });
   });
 
   const shutdown = () => {
-    console.log('[linkbridge] shutting down');
+    logger.info('shutting down');
+    signaling.stop();
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(1), 5_000).unref();
   };
@@ -28,6 +35,9 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  console.error('[linkbridge] fatal startup error', err);
+  logger.error('fatal startup error', {
+    error: err instanceof Error ? err.message : String(err),
+    stack: err instanceof Error ? err.stack : undefined,
+  });
   process.exit(1);
 });

@@ -11,6 +11,7 @@ import {
 import { logConnection } from '../services/connectionLogs.js';
 import { issueTurnCredentials } from '../relay/turn.js';
 import { config } from '../config.js';
+import { logger } from '../logger.js';
 import type { InboundMessage, OutboundMessage, SignalData } from './protocol.js';
 
 interface OwnerClient {
@@ -83,7 +84,10 @@ export class SignalingServer {
     });
     ws.on('message', (raw) => this.handleMessage(ws, raw));
     ws.on('close', () => this.handleClose(ws));
-    ws.on('error', () => ws.terminate());
+    ws.on('error', (err) => {
+      logger.warn('websocket error', { error: err.message });
+      ws.terminate();
+    });
   }
 
   private async recordHeartbeat(ws: WebSocket): Promise<void> {
@@ -158,7 +162,10 @@ export class SignalingServer {
         this.send(ws, { type: 'authed', peer: 'device', userId: payload.userId, deviceId: payload.sub });
         await this.markDeviceConnected(client);
       }
-    } catch {
+    } catch (err) {
+      logger.warn('websocket auth rejected', {
+        error: err instanceof Error ? err.message : String(err),
+      });
       this.send(ws, { type: 'error', message: 'Invalid token' });
       ws.close(1008, 'Invalid token');
     }
